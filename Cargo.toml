@@ -13,3 +13,7 @@ dirs = "4.0"
 regex = "1.5"
 reqwest = { version = "0.11", features = ["blocking", "rustls-tls"], default-features = false }
 tempfile = "3.2"
+
+[[bin]]
+name = "myuzik"
+path = "src/main.rs"

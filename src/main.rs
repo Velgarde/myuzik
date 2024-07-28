@@ -7,9 +7,13 @@ use rustyline::Editor;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
-use std::fs::{ File};
-use std::path::{Path, PathBuf};
+use std::fs::{File};
+use std::path::{ PathBuf};
 use std::process::Command;
+use std::env;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+
 #[derive(Serialize, Deserialize, Clone)]
 struct Song {
     name: String,
@@ -62,29 +66,40 @@ impl Myuzik {
         println!("{}", "Downloading audio...".blue());
 
         let yt_dlp_path = ensure_yt_dlp()?;
-        let output_template = "%(title)s.%(ext)s";
+        let current_dir = env::current_dir()?;
+        let storage_dir = current_dir.join("storage");
+
+        // Create the storage directory if it doesn't exist
+        if !storage_dir.exists() {
+            fs::create_dir_all(&storage_dir)?;
+            // Set permissions to read, write, and execute for the owner
+            let mut perms = fs::metadata(&storage_dir)?.permissions();
+            perms.set_mode(0o700);
+            fs::set_permissions(&storage_dir, perms)?;
+        }
+
+        let output_template = storage_dir.join("%(title)s.%(ext)s").to_string_lossy().to_string();
 
         let output = Command::new(&yt_dlp_path)
             .args(&[
                 "-x",
                 "--audio-format", "mp3",
                 "--audio-quality", "0",
-                "-o", output_template,
-                "--get-filename",
+                "-o", &output_template,
                 url,
             ])
             .output()?;
 
         if output.status.success() {
             let file_name = String::from_utf8(output.stdout)?.trim().to_string();
-            let file_path = Path::new(&file_name).with_extension("mp3");
+            let file_path = storage_dir.join(file_name).with_extension("mp3");
 
             Command::new(&yt_dlp_path)
                 .args(&[
                     "-x",
                     "--audio-format", "mp3",
                     "--audio-quality", "0",
-                    "-o", output_template,
+                    "-o", &output_template,
                     url,
                 ])
                 .status()?;
